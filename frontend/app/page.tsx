@@ -1,11 +1,32 @@
+"use client";
+
 import Link from "next/link";
 import { GamesList } from "@/components/games-list";
 import { getAllGames } from "@/lib/contract";
+import { useNetwork } from "@/contexts/network-context";
+import { useEffect, useState } from "react";
+import { Game } from "@/lib/contract";
 
-export const dynamic = "force-dynamic";
+export default function Home() {
+  const [games, setGames] = useState<Game[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { network } = useNetwork();
 
-export default async function Home() {
-  const games = await getAllGames();
+  useEffect(() => {
+    async function fetchGames() {
+      setLoading(true);
+      try {
+        const fetchedGames = await getAllGames(network);
+        setGames(fetchedGames);
+      } catch (error) {
+        console.error("Error fetching games:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchGames();
+  }, [network]);
 
   return (
     <section className="flex flex-col items-center py-20">
@@ -33,7 +54,11 @@ export default async function Home() {
 
       <div className="w-full max-w-6xl">
         <h2 className="text-2xl font-bold text-center mb-8">Active Games</h2>
-        <GamesList games={games} />
+        {loading ? (
+          <div className="text-center">Loading games...</div>
+        ) : (
+          <GamesList games={games} />
+        )}
       </div>
     </section>
   );

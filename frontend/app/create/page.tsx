@@ -5,9 +5,11 @@ import { useStacks } from "@/hooks/use-stacks";
 import { EMPTY_BOARD, Move } from "@/lib/contract";
 import { formatStx, parseStx } from "@/lib/stx-utils";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function CreateGame() {
   const { stxBalance, userData, connectWallet, handleCreateGame } = useStacks();
+  const router = useRouter();
 
   const [betAmount, setBetAmount] = useState(0);
   // When creating a new game, the initial board is entirely empty
@@ -25,8 +27,11 @@ export default function CreateGame() {
     // Find the moveIndex (i.e. the cell) where the user played their move
     const moveIndex = board.findIndex((cell) => cell !== Move.EMPTY);
     const move = Move.X;
-    // Trigger the onchain transaction popup
-    await handleCreateGame(parseStx(betAmount), moveIndex, move);
+    // Trigger the onchain transaction popup with redirect callback
+    await handleCreateGame(parseStx(betAmount), moveIndex, move, (gameId: number) => {
+      // Redirect to the created game
+      router.push(`/game/${gameId}`);
+    });
   }
 
   return (

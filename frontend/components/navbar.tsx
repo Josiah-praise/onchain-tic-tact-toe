@@ -2,10 +2,11 @@
 
 import { useStacks } from "@/hooks/use-stacks";
 import { abbreviateAddress } from "@/lib/stx-utils";
+import { NetworkSelector } from "@/components/network-selector";
 import Link from "next/link";
 
 export function Navbar() {
-  const { userData, connectWallet, disconnectWallet } = useStacks();
+  const { userData, connectWallet, disconnectWallet, networkType } = useStacks();
 
   return (
     <nav className="flex w-full items-center justify-between gap-4 p-4 h-16 border-b border-gray-500">
@@ -23,6 +24,7 @@ export function Navbar() {
         <Link href="/tournaments" className="text-gray-300 hover:text-gray-50">
           Tournaments
         </Link>
+        <NetworkSelector />
       </div>
 
       <div className="flex items-center gap-2">
@@ -32,7 +34,11 @@ export function Navbar() {
               type="button"
               className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              {abbreviateAddress(userData.profile.stxAddress.testnet)}
+              {abbreviateAddress(
+                networkType === "mainnet"
+                  ? userData.profile.stxAddress.mainnet
+                  : userData.profile.stxAddress.testnet
+              )}
             </button>
             <button
               type="button"

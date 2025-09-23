@@ -1,8 +1,9 @@
-import { createNewGame, joinGame, Move, play } from "@/lib/contract";
+import { createNewGame, joinGame, Move, play, getAllGames } from "@/lib/contract";
 import { getStxBalance } from "@/lib/stx-utils";
+import { useNetwork } from "@/contexts/network-context";
 import {
   AppConfig,
-  authenticate,
+  showConnect,
   openContractCall,
   type UserData,
   UserSession,
@@ -21,9 +22,10 @@ const userSession = new UserSession({ appConfig });
 export function useStacks() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [stxBalance, setStxBalance] = useState(0);
+  const { networkType, network } = useNetwork();
 
   function connectWallet() {
-    authenticate({
+    showConnect({
       appDetails,
       userSession,
       onFinish: () => {
@@ -40,7 +42,8 @@ export function useStacks() {
   async function handleCreateGame(
     betAmount: number,
     moveIndex: number,
-    move: Move
+    move: Move,
+    onSuccess?: (gameId: number) => void
   ) {
     if (typeof window === "undefined") return;
     if (moveIndex < 0 || moveIndex > 8) {
@@ -58,9 +61,29 @@ export function useStacks() {
       await openContractCall({
         ...txOptions,
         appDetails,
-        onFinish: (data) => {
+        onFinish: async (data) => {
           console.log(data);
           window.alert("Sent create game transaction");
+          
+          // Wait a bit for the transaction to be processed, then get the latest game ID
+          if (onSuccess) {
+            setTimeout(async () => {
+              try {
+                const games = await getAllGames(network);
+                const userAddress = userData.profile.stxAddress.testnet;
+                // Find the most recent game created by this user
+                const userCreatedGames = games.filter(game => 
+                  game["player-one"] === userAddress && game["player-two"] === null
+                );
+                if (userCreatedGames.length > 0) {
+                  const latestGame = userCreatedGames.sort((a, b) => b.id - a.id)[0];
+                  onSuccess(latestGame.id);
+                }
+              } catch (error) {
+                console.error("Failed to get created game ID:", error);
+              }
+            }, 3000); // Wait 3 seconds for transaction to be processed
+          }
         },
         postConditionMode: PostConditionMode.Allow,
       });
@@ -124,23 +147,33 @@ export function useStacks() {
   }
 
   useEffect(() => {
-    if (userSession.isSignInPending()) {
-      userSession.handlePendingSignIn().then((userData) => {
-        setUserData(userData);
-      });
-    } else if (userSession.isUserSignedIn()) {
-      setUserData(userSession.loadUserData());
+    try {
+      if (userSession.isSignInPending()) {
+        userSession.handlePendingSignIn().then((userData) => {
+          setUserData(userData);
+        });
+      } else if (userSession.isUserSignedIn()) {
+        setUserData(userSession.loadUserData());
+      }
+    } catch (error) {
+      // Clear incompatible session data from v8.x.x
+      console.warn("Clearing incompatible session data:", error);
+      userSession.signUserOut();
+      localStorage.clear();
     }
   }, []);
 
   useEffect(() => {
     if (userData) {
-      const address = userData.profile.stxAddress.testnet;
-      getStxBalance(address).then((balance) => {
+      // In v7.x.x, both addresses are available, use the network-appropriate one
+      const address = networkType === "mainnet"
+        ? userData.profile.stxAddress.mainnet
+        : userData.profile.stxAddress.testnet;
+      getStxBalance(address, networkType).then((balance) => {
         setStxBalance(balance);
       });
     }
-  }, [userData]);
+  }, [userData, networkType]);
 
   return {
     userData,
@@ -150,5 +183,7 @@ export function useStacks() {
     handleCreateGame,
     handleJoinGame,
     handlePlayGame,
+    networkType,
+    network,
   };
 }

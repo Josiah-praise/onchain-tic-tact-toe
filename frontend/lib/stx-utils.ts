@@ -6,12 +6,15 @@ export function abbreviateTxnId(txnId: string) {
   return `${txnId.substring(0, 5)}...${txnId.substring(62)}`;
 }
 
-export function explorerAddress(address: string) {
-  return `https://explorer.hiro.so/address/${address}?chain=testnet`;
+export function explorerAddress(address: string, networkType: "mainnet" | "testnet" = "testnet") {
+  const chain = networkType === "mainnet" ? "mainnet" : "testnet";
+  return `https://explorer.hiro.so/address/${address}?chain=${chain}`;
 }
 
-export async function getStxBalance(address: string) {
-  const baseUrl = "https://api.testnet.hiro.so";
+export async function getStxBalance(address: string, networkType: "mainnet" | "testnet" = "testnet") {
+  const baseUrl = networkType === "mainnet"
+    ? "https://api.hiro.so"
+    : "https://api.testnet.hiro.so";
   const url = `${baseUrl}/extended/v1/address/${address}/stx`;
 
   const response = await fetch(url).then((res) => res.json());

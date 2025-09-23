@@ -1,4 +1,4 @@
-import { STACKS_TESTNET } from "@stacks/network";
+import { STACKS_TESTNET, StacksNetwork } from "@stacks/network";
 import {
   BooleanCV,
   cvToValue,
@@ -11,10 +11,11 @@ import {
   UIntCV,
 } from "@stacks/transactions";
 
-// REPLACE THESE WITH YOUR OWN
-const CONTRACT_ADDRESS =
+
+// Contract configuration - can be overridden via environment variables
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
   "STZ5Q1C2GVSMCWS9NWVDEKHNW04THC75SEGDHS74";
-const CONTRACT_NAME = "tic-tac-toe";
+const CONTRACT_NAME = process.env.NEXT_PUBLIC_CONTRACT_NAME || "tic-tac-toe";
 
 type GameCV = {
   "player-one": PrincipalCV;
@@ -84,7 +85,92 @@ export const EMPTY_BOARD = [
   Move.EMPTY,
 ];
 
-export async function getAllGames() {
+// Helper function to check if a game is a draw
+export function isGameDraw(game: Game): boolean {
+  // In draws, the winner is set to the contract itself (address.contract-name)
+  const contractIdentifier = `${CONTRACT_ADDRESS}.${CONTRACT_NAME}`;
+  return game.winner === contractIdentifier;
+}
+
+// Helper function to check if a game is over (won or drawn)
+export function isGameOver(game: Game): boolean {
+  // Game is over if there's a winner (includes ties where winner = contract address)
+  if (game.winner !== null) {
+    return true;
+  }
+  
+  // Also check if the board is full as a backup (shouldn't be needed if contract is working correctly)
+  return isBoardFull(game.board);
+}
+
+// Helper function to check if the board is full
+export function isBoardFull(board: number[]): boolean {
+  return board.every(cell => cell !== Move.EMPTY);
+}
+
+// Client-side win detection logic (mirrors contract's has-won function)
+export function checkWinCondition(board: number[]): 'X' | 'O' | null {
+  const winPatterns = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns  
+    [0, 4, 8], [2, 4, 6] // Diagonals
+  ];
+  
+  for (const [a, b, c] of winPatterns) {
+    if (board[a] !== Move.EMPTY && 
+        board[a] === board[b] && 
+        board[a] === board[c]) {
+      return board[a] === Move.X ? 'X' : 'O';
+    }
+  }
+  return null;
+}
+
+// Check if the current board state is a tie
+export function checkTieCondition(board: number[]): boolean {
+  return isBoardFull(board) && checkWinCondition(board) === null;
+}
+
+// Get the winning pattern indices if there's a winner
+export function getWinningPattern(board: number[]): number[] | null {
+  const winPatterns = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns  
+    [0, 4, 8], [2, 4, 6] // Diagonals
+  ];
+  
+  for (const [a, b, c] of winPatterns) {
+    if (board[a] !== Move.EMPTY && 
+        board[a] === board[b] && 
+        board[a] === board[c]) {
+      return [a, b, c];
+    }
+  }
+  return null;
+}
+
+// Comprehensive game status checker
+export function getGameStatus(board: number[]): {
+  isOver: boolean;
+  winner: 'X' | 'O' | null;
+  isTie: boolean;
+  status: 'active' | 'won' | 'tie';
+  winningPattern: number[] | null;
+} {
+  const winner = checkWinCondition(board);
+  const isTie = checkTieCondition(board);
+  const winningPattern = winner ? getWinningPattern(board) : null;
+  
+  return {
+    isOver: winner !== null || isTie,
+    winner,
+    isTie,
+    status: winner ? 'won' : (isTie ? 'tie' : 'active'),
+    winningPattern
+  };
+}
+
+export async function getAllGames(network: StacksNetwork = STACKS_TESTNET) {
   // Fetch the latest-game-id from the contract
   const latestGameIdCV = (await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -92,22 +178,38 @@ export async function getAllGames() {
     functionName: "get-latest-game-id",
     functionArgs: [],
     senderAddress: CONTRACT_ADDRESS,
-    network: STACKS_TESTNET,
+    network,
   })) as UIntCV;
 
   // Convert the uintCV to a JS/TS number type
-  const latestGameId = parseInt(latestGameIdCV.value.toString());
+  const latestGameId = Math.floor(Number(latestGameIdCV.value.toString()));
+
+  // Validate latestGameId
+  if (isNaN(latestGameId) || latestGameId < 0) {
+    console.warn("Invalid latestGameId:", latestGameId);
+    return [];
+  }
 
   // Loop from 0 to latestGameId-1 and fetch the game details for each game
   const games: Game[] = [];
   for (let i = 0; i < latestGameId; i++) {
-    const game = await getGame(i);
-    if (game) games.push(game);
+    try {
+      const game = await getGame(i, network);
+      if (game) games.push(game);
+    } catch (error) {
+      console.warn(`Error fetching game ${i}:`, error);
+      // Continue with other games
+    }
   }
   return games;
 }
 
-export async function getGame(gameId: number) {
+export async function getGame(gameId: number, network: StacksNetwork = STACKS_TESTNET) {
+  // Validate gameId is a valid integer
+  if (!Number.isInteger(gameId) || gameId < 0) {
+    throw new Error(`Invalid game ID: ${gameId}. Must be a non-negative integer.`);
+  }
+
   // Use the get-game read only function to fetch the game details for the given gameId
   const gameDetails = await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -115,7 +217,7 @@ export async function getGame(gameId: number) {
     functionName: "get-game",
     functionArgs: [uintCV(gameId)],
     senderAddress: CONTRACT_ADDRESS,
-    network: STACKS_TESTNET,
+    network,
   });
 
   const responseCV = gameDetails as OptionalCV<TupleCV<GameCV>>;
@@ -131,16 +233,16 @@ export async function getGame(gameId: number) {
     id: gameId,
     "player-one": gameCV["player-one"].value,
     "player-two":
-      gameCV["player-two"].type === "some"
+      gameCV["player-two"]?.type === "some"
         ? gameCV["player-two"].value.value
         : null,
     "is-player-one-turn": cvToValue(gameCV["is-player-one-turn"]),
     "bet-amount": parseInt(gameCV["bet-amount"].value.toString()),
     board: gameCV["board"].value.map((cell) => parseInt(cell.value.toString())),
     winner:
-      gameCV["winner"].type === "some" ? gameCV["winner"].value.value : null,
+      gameCV["winner"]?.type === "some" ? gameCV["winner"].value.value : null,
     "tournament-id":
-      gameCV["tournament-id"].type === "some"
+      gameCV["tournament-id"]?.type === "some"
         ? parseInt(gameCV["tournament-id"].value.value.toString())
         : null,
   };
@@ -187,7 +289,7 @@ export async function play(gameId: number, moveIndex: number, move: Move) {
 
 // Tournament Functions
 
-export async function getAllTournaments() {
+export async function getAllTournaments(network: StacksNetwork = STACKS_TESTNET) {
   // Fetch the latest-tournament-id from the contract
   const latestTournamentIdCV = (await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -195,7 +297,7 @@ export async function getAllTournaments() {
     functionName: "get-latest-tournament-id",
     functionArgs: [],
     senderAddress: CONTRACT_ADDRESS,
-    network: STACKS_TESTNET,
+    network,
   })) as UIntCV;
 
   // Convert the uintCV to a JS/TS number type
@@ -204,13 +306,13 @@ export async function getAllTournaments() {
   // Loop from 0 to latestTournamentId-1 and fetch the tournament details for each tournament
   const tournaments: Tournament[] = [];
   for (let i = 0; i < latestTournamentId; i++) {
-    const tournament = await getTournament(i);
+    const tournament = await getTournament(i, network);
     if (tournament) tournaments.push(tournament);
   }
   return tournaments;
 }
 
-export async function getTournament(tournamentId: number) {
+export async function getTournament(tournamentId: number, network: StacksNetwork = STACKS_TESTNET) {
   // Use the get-tournament read only function to fetch the tournament details for the given tournamentId
   const tournamentDetails = await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -218,7 +320,7 @@ export async function getTournament(tournamentId: number) {
     functionName: "get-tournament",
     functionArgs: [uintCV(tournamentId)],
     senderAddress: CONTRACT_ADDRESS,
-    network: STACKS_TESTNET,
+    network,
   });
 
   const responseCV = tournamentDetails as OptionalCV<TupleCV<TournamentCV>>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Game } from "@/lib/contract";
+import { Game, isGameOver, isGameDraw } from "@/lib/contract";
 import Link from "next/link";
 import { GameBoard } from "./game-board";
 import { useStacks } from "@/hooks/use-stacks";
@@ -11,7 +11,7 @@ export function GamesList({ games }: { games: Game[] }) {
   const { userData } = useStacks();
 
   // User Games are games in which the user is a player
-  // and a winner has not been decided yet
+  // This includes: games you created (waiting for opponent) and active games where you're playing
   const userGames = useMemo(() => {
     if (!userData) return [];
     const userAddress = userData.profile.stxAddress.testnet;
@@ -19,7 +19,7 @@ export function GamesList({ games }: { games: Game[] }) {
       (game) =>
         (game["player-one"] === userAddress ||
           game["player-two"] === userAddress) &&
-        game.winner === null
+        !isGameOver(game) // Game is not over (no winner or tie)
     );
     return filteredGames;
   }, [userData, games]);
@@ -32,15 +32,15 @@ export function GamesList({ games }: { games: Game[] }) {
 
     return games.filter(
       (game) =>
-        game.winner === null &&
+        !isGameOver(game) &&
         game["player-one"] !== userAddress &&
         game["player-two"] === null
     );
   }, [games, userData]);
 
-  // Ended games are games in which the winner has been decided
+  // Ended games are games in which the winner has been decided or it's a tie
   const endedGames = useMemo(() => {
-    return games.filter((game) => game.winner !== null);
+    return games.filter((game) => isGameOver(game));
   }, [games]);
 
   return (
@@ -51,7 +51,7 @@ export function GamesList({ games }: { games: Game[] }) {
           {userGames.length === 0 ? (
             <div className="text-center py-12 border rounded-lg">
               <p className="text-gray-500 mb-4">
-                You haven&apos;t joined any games yet
+                You don&apos;t have any active games
               </p>
               <Link
                 href="/create"
@@ -62,25 +62,35 @@ export function GamesList({ games }: { games: Game[] }) {
             </div>
           ) : (
             <div className="flex items-center gap-8 max-w-7xl overflow-y-scroll">
-              {userGames.map((game, index) => (
-                <Link
-                  key={`your-game-${index}`}
-                  href={`/game/${game.id}`}
-                  className="shrink-0 flex flex-col gap-2 border p-4 rounded-md border-gray-700 bg-gray-900 w-fit"
-                >
-                  <GameBoard
-                    key={index}
-                    board={game.board}
-                    cellClassName="size-8 text-xl"
-                  />
-                  <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
-                    {formatStx(game["bet-amount"])} STX
-                  </div>
-                  <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
-                    Next Turn: {game["is-player-one-turn"] ? "X" : "O"}
-                  </div>
-                </Link>
-              ))}
+              {userGames.map((game, index) => {
+                const waitingForPlayer = game["player-two"] === null;
+                return (
+                  <Link
+                    key={`your-game-${index}`}
+                    href={`/game/${game.id}`}
+                    className="shrink-0 flex flex-col gap-2 border p-4 rounded-md border-gray-700 bg-gray-900 w-fit"
+                  >
+                    <GameBoard
+                      key={index}
+                      board={game.board}
+                      cellClassName="size-8 text-xl"
+                    />
+                    <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
+                      {formatStx(game["bet-amount"])} STX
+                    </div>
+                    <div className={`text-md px-1 py-0.5 rounded text-center w-full ${
+                      waitingForPlayer 
+                        ? "bg-yellow-600 text-yellow-100" 
+                        : "bg-gray-800"
+                    }`}>
+                      {waitingForPlayer 
+                        ? "Waiting for opponent" 
+                        : `Next Turn: ${game["is-player-one-turn"] ? "X" : "O"}`
+                      }
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
@@ -141,25 +151,64 @@ export function GamesList({ games }: { games: Game[] }) {
           </div>
         ) : (
           <div className="flex items-center gap-8 max-w-7xl overflow-y-scroll">
-            {endedGames.map((game, index) => (
-              <Link
-                key={`ended-game-${index}`}
-                href={`/game/${game.id}`}
-                className="shrink-0 flex flex-col gap-2 border p-4 rounded-md border-gray-700 bg-gray-900 w-fit"
-              >
-                <GameBoard
-                  key={index}
-                  board={game.board}
-                  cellClassName="size-8 text-xl"
-                />
-                <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
-                  {formatStx(game["bet-amount"])} STX
-                </div>
-                <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
-                  Winner: {game["is-player-one-turn"] ? "O" : "X"}
-                </div>
-              </Link>
-            ))}
+            {endedGames.map((game, index) => {
+              if (!userData) return null;
+              
+              const userAddress = userData.profile.stxAddress.testnet;
+              const isUserPlayerOne = game["player-one"] === userAddress;
+              const isUserPlayerTwo = game["player-two"] === userAddress;
+              const isUserInGame = isUserPlayerOne || isUserPlayerTwo;
+              
+              // Determine the result text based on game outcome
+              let resultText = "";
+              let resultColor = "";
+              
+              if (game.winner === null) {
+                // Winner is null - this should be treated as a tie
+                resultText = "Result: Tie";
+                resultColor = "bg-yellow-600 text-yellow-100";
+              } else if (isGameDraw(game)) {
+                resultText = "Result: Tie";
+                resultColor = "bg-yellow-600 text-yellow-100";
+              } else if (isUserInGame) {
+                // Check if the user won
+                const userWon = game.winner === userAddress;
+                if (userWon) {
+                  resultText = "Winner: You";
+                  resultColor = "bg-green-600 text-green-100";
+                } else {
+                  // User lost - show opponent's mark
+                  const opponentMark = isUserPlayerOne ? "O" : "X";
+                  resultText = `Winner: ${opponentMark}`;
+                  resultColor = "bg-red-600 text-red-100";
+                }
+              } else {
+                // User not in game - show winner's mark
+                const winnerIsPlayerOne = game.winner === game["player-one"];
+                resultText = `Winner: ${winnerIsPlayerOne ? "X" : "O"}`;
+                resultColor = "bg-gray-600";
+              }
+              
+              return (
+                <Link
+                  key={`ended-game-${index}`}
+                  href={`/game/${game.id}`}
+                  className="shrink-0 flex flex-col gap-2 border p-4 rounded-md border-gray-700 bg-gray-900 w-fit"
+                >
+                  <GameBoard
+                    key={index}
+                    board={game.board}
+                    cellClassName="size-8 text-xl"
+                  />
+                  <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
+                    {formatStx(game["bet-amount"])} STX
+                  </div>
+                  <div className={`text-md px-1 py-0.5 rounded text-center w-full ${resultColor}`}>
+                    {resultText}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

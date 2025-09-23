@@ -220,6 +220,59 @@ describe("Tic Tac Toe Tests", () => {
       })
     );
   });
+
+  it("prevents moves after game is won", () => {
+    // Create a game and let player one win
+    createGame(100, 0, 1, alice);
+    joinGame(3, 2, bob);
+    play(1, 1, alice);
+    play(4, 2, bob);
+    play(2, 1, alice); // Alice wins with three X's in a row
+
+    // Try to make another move after the game is won - should fail
+    const { result } = play(5, 2, bob);
+    expect(result).toBeErr(Cl.uint(105)); // ERR_GAME_ALREADY_OVER
+  });
+
+  it("handles draw/tie games correctly", () => {
+    // Create a game and play to a draw
+    createGame(100, 4, 1, alice); // X in center
+    joinGame(0, 2, bob);          // O in top-left
+    play(8, 1, alice);            // X in bottom-right
+    play(1, 2, bob);              // O in top-center
+    play(7, 1, alice);            // X in bottom-center
+    play(5, 2, bob);              // O in middle-right
+    play(3, 1, alice);            // X in middle-left
+    play(6, 2, bob);              // O in bottom-left
+    const { result, events } = play(2, 1, alice); // X in top-right - board is now full
+
+    expect(result).toBeOk(Cl.uint(0));
+    expect(events.length).toBe(3); // Two transfers (refunds) and one print event
+
+    const gameData = simnet.getMapEntry("tic-tac-toe", "games", Cl.uint(0));
+    expect(gameData).toBeSome(
+      Cl.tuple({
+        "player-one": Cl.principal(alice),
+        "player-two": Cl.some(Cl.principal(bob)),
+        "is-player-one-turn": Cl.bool(false),
+        "bet-amount": Cl.uint(100),
+        board: Cl.list([
+          Cl.uint(2), // O
+          Cl.uint(2), // O
+          Cl.uint(1), // X
+          Cl.uint(1), // X
+          Cl.uint(1), // X
+          Cl.uint(2), // O
+          Cl.uint(2), // O
+          Cl.uint(1), // X
+          Cl.uint(1), // X
+        ]),
+        "tournament-id": Cl.none(),
+        // Winner should be the contract address (indicating a draw)
+        winner: Cl.some(Cl.principal("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.tic-tac-toe")),
+      })
+    );
+  });
 });
 
 describe("Tournament System Tests", () => {

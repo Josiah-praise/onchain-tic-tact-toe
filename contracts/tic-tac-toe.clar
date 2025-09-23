@@ -55,6 +55,7 @@ uint
 (define-constant ERR_GAME_NOT_FOUND u102) ;; Error thrown when a game cannot be found given a Game ID, i.e. invalid Game ID
 (define-constant ERR_GAME_CANNOT_BE_JOINED u103) ;; Error thrown when a game cannot be joined, usually because it already has two players
 (define-constant ERR_NOT_YOUR_TURN u104) ;; Error thrown when a player tries to make a move when it is not their turn
+(define-constant ERR_GAME_ALREADY_OVER u105) ;; Error thrown when trying to make a move in a game that already has a winner
 
 ;; Tournament error constants
 (define-constant ERR_TOURNAMENT_NOT_FOUND u200)
@@ -159,7 +160,7 @@ uint
 ))
 
 ;; Given a board, return true if any possible three-in-a-row line has been completed
-(define-private (has-won (board (list 9 uint))) 
+(define-private (has-won (board (list 9 uint)))
     (or
         (is-line board u0 u1 u2) ;; Row 1
         (is-line board u3 u4 u5) ;; Row 2
@@ -169,6 +170,21 @@ uint
         (is-line board u2 u5 u8) ;; Column 3
         (is-line board u0 u4 u8) ;; Left to Right Diagonal
         (is-line board u2 u4 u6) ;; Right to Left Diagonal
+    )
+)
+
+;; Given a board, return true if all cells are filled (no empty cells)
+(define-private (is-board-full (board (list 9 uint)))
+    (and
+        (not (is-eq (unwrap! (element-at? board u0) false) u0))
+        (not (is-eq (unwrap! (element-at? board u1) false) u0))
+        (not (is-eq (unwrap! (element-at? board u2) false) u0))
+        (not (is-eq (unwrap! (element-at? board u3) false) u0))
+        (not (is-eq (unwrap! (element-at? board u4) false) u0))
+        (not (is-eq (unwrap! (element-at? board u5) false) u0))
+        (not (is-eq (unwrap! (element-at? board u6) false) u0))
+        (not (is-eq (unwrap! (element-at? board u7) false) u0))
+        (not (is-eq (unwrap! (element-at? board u8) false) u0))
     )
 )
 
@@ -190,15 +206,26 @@ uint
         (game-board (unwrap! (replace-at? original-board move-index move) (err ERR_INVALID_MOVE)))
         ;; Check if the game has been won now with this modified board
         (is-now-winner (has-won game-board))
+        ;; Check if the board is now full (for draw detection)
+        (is-board-now-full (is-board-full game-board))
+        ;; Check if the game is over (either won or drawn)
+        (is-game-over (or is-now-winner is-board-now-full))
         ;; Merge the game data with the updated board and marking the next turn to be player two's turn
-        ;; Also mark the winner if the game has been won
+        ;; Also mark the winner if the game has been won, or use a special value for draws
         (game-data (merge original-game-data {
             board: game-board,
             is-player-one-turn: (not is-player-one-turn),
-            winner: (if is-now-winner (some player-turn) none)
+            winner: (if is-now-winner
+                        (some player-turn)
+                        (if is-board-now-full
+                            ;; Use the contract address to indicate a draw/tie
+                            (some THIS_CONTRACT)
+                            none))
         }))
     )
 
+    ;; Ensure that the game is not already over (no winner exists)
+    (asserts! (is-none (get winner original-game-data)) (err ERR_GAME_ALREADY_OVER))
     ;; Ensure that the function is being called by the player whose turn it is
     (asserts! (is-eq player-turn contract-caller) (err ERR_NOT_YOUR_TURN))
     ;; Ensure that the move being played is the correct move based on the current turn (X or O)
@@ -206,8 +233,19 @@ uint
     ;; Ensure that the move meets validity requirements
     (asserts! (validate-move original-board move-index move) (err ERR_INVALID_MOVE))
 
-    ;; if the game has been won, transfer the (bet amount * 2 = both players bets) STX to the winner
-    (if is-now-winner (try! (as-contract (stx-transfer? (* u2 (get bet-amount game-data)) tx-sender player-turn))) false)
+    ;; Handle end game fund transfers
+    (if is-game-over
+        (if is-now-winner
+            ;; Someone won: transfer all funds to the winner
+            (try! (as-contract (stx-transfer? (* u2 (get bet-amount game-data)) tx-sender player-turn)))
+            ;; Draw: return funds to both players
+            (begin
+                (try! (as-contract (stx-transfer? (get bet-amount game-data) tx-sender (get player-one original-game-data))))
+                (try! (as-contract (stx-transfer? (get bet-amount game-data) tx-sender (unwrap! (get player-two original-game-data) (err ERR_GAME_NOT_FOUND)))))
+            )
+        )
+        false
+    )
 
     ;; Update the games map with the new game data
     (map-set games game-id game-data)
