@@ -14,11 +14,10 @@ const account = wallet.accounts[0];
 const testnetAddress = getStxAddress({ account, transactionVersion: 128 }); // 128 = testnet
 const mainnetAddress = getStxAddress({ account, transactionVersion: 22 });   // 22 = mainnet
 
-console.log('=== DEPLOYMENT ACCOUNT INFO ===');
-console.log('Account Index: 0 (first account)');
-console.log('Testnet Address:', testnetAddress);
-console.log('Mainnet Address:', mainnetAddress);
-console.log('Private Key:', account.stxPrivateKey);
-console.log('\n=== CLARINET DEPLOYMENT ===');
-console.log('Your contracts were deployed from:', testnetAddress);
-console.log('This is the address that owns your deployed contracts on testnet.');
+// Deployment information
+const deploymentInfo = {
+  accountIndex: 0,
+  testnetAddress,
+  mainnetAddress,
+  privateKey: account.stxPrivateKey
+};

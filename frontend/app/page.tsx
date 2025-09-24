@@ -18,8 +18,7 @@ export default function Home() {
       try {
         const fetchedGames = await getAllGames(network);
         setGames(fetchedGames);
-      } catch (error) {
-        console.error("Error fetching games:", error);
+      } catch {
       } finally {
         setLoading(false);
       }
@@ -31,7 +30,7 @@ export default function Home() {
   return (
     <section className="flex flex-col items-center py-20">
       <div className="text-center mb-20">
-        <h1 className="text-4xl font-bold mb-4">Tic Tac Toe 🎲</h1>
+        <h1 className="text-4xl font-bold mb-4">Tic Tac Toe</h1>
         <p className="text-sm text-gray-500 mb-8">
           Play 1v1 Tic Tac Toe on the Stacks blockchain
         </p>

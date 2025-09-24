@@ -3,8 +3,12 @@
 import { Tournament } from "@/lib/contract";
 import { TournamentCard } from "./tournament-card";
 
+type TournamentWithParticipation = Tournament & {
+  isUserParticipating: boolean;
+};
+
 type TournamentsListProps = {
-  tournaments: Tournament[];
+  tournaments: TournamentWithParticipation[];
   userAddress?: string;
   onJoinTournament?: (tournamentId: number) => void;
   onStartTournament?: (tournamentId: number) => void;
@@ -18,11 +22,11 @@ export function TournamentsList({
 }: TournamentsListProps) {
   if (tournaments.length === 0) {
     return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
+      <div className="text-center py-12 border rounded-lg">
+        <h3 className="text-lg font-medium text-white mb-2">
           No tournaments found
         </h3>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-500 mb-6">
           Be the first to create a tournament and challenge other players!
         </p>
       </div>
@@ -30,10 +34,18 @@ export function TournamentsList({
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold mb-4">Available Tournaments</h2>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {tournaments.map((tournament) => {
         const isCreator = userAddress === tournament.creator;
-        const canJoin = userAddress && !isCreator;
+        const isParticipating = tournament.isUserParticipating;
+
+        // User can join if:
+        // 1. They are connected (userAddress exists)
+        // 2. They are NOT the creator
+        // 3. They are NOT already participating
+        const canJoin = userAddress && !isCreator && !isParticipating;
 
         return (
           <TournamentCard
@@ -43,9 +55,11 @@ export function TournamentsList({
             onStart={onStartTournament}
             isCreator={isCreator}
             canJoin={!!canJoin}
+            isParticipating={isParticipating}
           />
         );
       })}
+      </div>
     </div>
   );
 }

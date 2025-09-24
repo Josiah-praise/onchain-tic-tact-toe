@@ -14,7 +14,9 @@ export default function GamePage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const gameId = Array.isArray(params.gameid) ? params.gameid[0] : params.gameid;
+  const gameId = Array.isArray(params.gameid)
+    ? params.gameid[0]
+    : params.gameid;
 
   const fetchGame = useCallback(async () => {
     if (!gameId) return;
@@ -34,7 +36,6 @@ export default function GamePage() {
         setError(null);
       }
     } catch (err) {
-      console.error("Error fetching game:", err);
       setError(err instanceof Error ? err.message : "Failed to load game");
     }
   }, [gameId, network]);
@@ -93,6 +94,26 @@ export default function GamePage() {
   return (
     <section className="flex flex-col items-center py-20">
       <div className="text-center mb-20">
+        {/* Tournament Navigation Breadcrumbs */}
+        {game["tournament-id"] !== null && (
+          <div className="mb-6">
+            <nav className="flex items-center justify-center space-x-2 text-sm text-gray-600">
+              <a href="/tournaments" className="hover:text-gray-900">
+                Tournaments
+              </a>
+              <span>→</span>
+              <a
+                href={`/tournament/${game["tournament-id"]}`}
+                className="hover:text-gray-900"
+              >
+                Tournament #{game["tournament-id"]}
+              </a>
+              <span>→</span>
+              <span className="text-gray-900 font-medium">Game #{gameId}</span>
+            </nav>
+          </div>
+        )}
+
         <div className="flex items-center justify-center gap-4 mb-4">
           <h1 className="text-4xl font-bold">Game #{gameId}</h1>
           <button

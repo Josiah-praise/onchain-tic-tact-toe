@@ -11,11 +11,11 @@ import {
   UIntCV,
 } from "@stacks/transactions";
 
-
-// Contract configuration - can be overridden via environment variables
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+// Contract configuration - TESTNET ONLY (contract not deployed on mainnet)
+const CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
   "STZ5Q1C2GVSMCWS9NWVDEKHNW04THC75SEGDHS74";
-const CONTRACT_NAME = process.env.NEXT_PUBLIC_CONTRACT_NAME || "tic-tac-toe";
+const CONTRACT_NAME = process.env.NEXT_PUBLIC_CONTRACT_NAME || "tic-tac-toe-v2";
 
 type GameCV = {
   "player-one": PrincipalCV;
@@ -98,29 +98,36 @@ export function isGameOver(game: Game): boolean {
   if (game.winner !== null) {
     return true;
   }
-  
+
   // Also check if the board is full as a backup (shouldn't be needed if contract is working correctly)
   return isBoardFull(game.board);
 }
 
 // Helper function to check if the board is full
 export function isBoardFull(board: number[]): boolean {
-  return board.every(cell => cell !== Move.EMPTY);
+  return board.every((cell) => cell !== Move.EMPTY);
 }
 
 // Client-side win detection logic (mirrors contract's has-won function)
-export function checkWinCondition(board: number[]): 'X' | 'O' | null {
+export function checkWinCondition(board: number[]): "X" | "O" | null {
   const winPatterns = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns  
-    [0, 4, 8], [2, 4, 6] // Diagonals
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8], // Rows
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8], // Columns
+    [0, 4, 8],
+    [2, 4, 6], // Diagonals
   ];
-  
+
   for (const [a, b, c] of winPatterns) {
-    if (board[a] !== Move.EMPTY && 
-        board[a] === board[b] && 
-        board[a] === board[c]) {
-      return board[a] === Move.X ? 'X' : 'O';
+    if (
+      board[a] !== Move.EMPTY &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
+      return board[a] === Move.X ? "X" : "O";
     }
   }
   return null;
@@ -134,15 +141,22 @@ export function checkTieCondition(board: number[]): boolean {
 // Get the winning pattern indices if there's a winner
 export function getWinningPattern(board: number[]): number[] | null {
   const winPatterns = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns  
-    [0, 4, 8], [2, 4, 6] // Diagonals
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8], // Rows
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8], // Columns
+    [0, 4, 8],
+    [2, 4, 6], // Diagonals
   ];
-  
+
   for (const [a, b, c] of winPatterns) {
-    if (board[a] !== Move.EMPTY && 
-        board[a] === board[b] && 
-        board[a] === board[c]) {
+    if (
+      board[a] !== Move.EMPTY &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
       return [a, b, c];
     }
   }
@@ -152,21 +166,21 @@ export function getWinningPattern(board: number[]): number[] | null {
 // Comprehensive game status checker
 export function getGameStatus(board: number[]): {
   isOver: boolean;
-  winner: 'X' | 'O' | null;
+  winner: "X" | "O" | null;
   isTie: boolean;
-  status: 'active' | 'won' | 'tie';
+  status: "active" | "won" | "tie";
   winningPattern: number[] | null;
 } {
   const winner = checkWinCondition(board);
   const isTie = checkTieCondition(board);
   const winningPattern = winner ? getWinningPattern(board) : null;
-  
+
   return {
     isOver: winner !== null || isTie,
     winner,
     isTie,
-    status: winner ? 'won' : (isTie ? 'tie' : 'active'),
-    winningPattern
+    status: winner ? "won" : isTie ? "tie" : "active",
+    winningPattern,
   };
 }
 
@@ -196,18 +210,22 @@ export async function getAllGames(network: StacksNetwork = STACKS_TESTNET) {
     try {
       const game = await getGame(i, network);
       if (game) games.push(game);
-    } catch (error) {
-      console.warn(`Error fetching game ${i}:`, error);
+    } catch {
       // Continue with other games
     }
   }
   return games;
 }
 
-export async function getGame(gameId: number, network: StacksNetwork = STACKS_TESTNET) {
+export async function getGame(
+  gameId: number,
+  network: StacksNetwork = STACKS_TESTNET
+) {
   // Validate gameId is a valid integer
   if (!Number.isInteger(gameId) || gameId < 0) {
-    throw new Error(`Invalid game ID: ${gameId}. Must be a non-negative integer.`);
+    throw new Error(
+      `Invalid game ID: ${gameId}. Must be a non-negative integer.`
+    );
   }
 
   // Use the get-game read only function to fetch the game details for the given gameId
@@ -249,7 +267,6 @@ export async function getGame(gameId: number, network: StacksNetwork = STACKS_TE
   return game;
 }
 
-
 export async function createNewGame(
   betAmount: number,
   moveIndex: number,
@@ -289,7 +306,10 @@ export async function play(gameId: number, moveIndex: number, move: Move) {
 
 // Tournament Functions
 
-export async function getAllTournaments(network: StacksNetwork = STACKS_TESTNET) {
+export async function getAllTournaments(
+  network: StacksNetwork = STACKS_TESTNET
+) {
+
   // Fetch the latest-tournament-id from the contract
   const latestTournamentIdCV = (await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -300,6 +320,7 @@ export async function getAllTournaments(network: StacksNetwork = STACKS_TESTNET)
     network,
   })) as UIntCV;
 
+
   // Convert the uintCV to a JS/TS number type
   const latestTournamentId = parseInt(latestTournamentIdCV.value.toString());
 
@@ -307,12 +328,18 @@ export async function getAllTournaments(network: StacksNetwork = STACKS_TESTNET)
   const tournaments: Tournament[] = [];
   for (let i = 0; i < latestTournamentId; i++) {
     const tournament = await getTournament(i, network);
-    if (tournament) tournaments.push(tournament);
+    if (tournament) {
+      tournaments.push(tournament);
+    }
   }
   return tournaments;
 }
 
-export async function getTournament(tournamentId: number, network: StacksNetwork = STACKS_TESTNET) {
+export async function getTournament(
+  tournamentId: number,
+  network: StacksNetwork = STACKS_TESTNET
+) {
+
   // Use the get-tournament read only function to fetch the tournament details for the given tournamentId
   const tournamentDetails = await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -323,11 +350,16 @@ export async function getTournament(tournamentId: number, network: StacksNetwork
     network,
   });
 
+
   const responseCV = tournamentDetails as OptionalCV<TupleCV<TournamentCV>>;
   // If we get back a none, then the tournament does not exist and we return null
-  if (responseCV.type === "none") return null;
+  if (responseCV.type === "none") {
+    return null;
+  }
   // If we get back a value that is not a tuple, something went wrong and we return null
-  if (responseCV.value.type !== "tuple") return null;
+  if (responseCV.value.type !== "tuple") {
+    return null;
+  }
 
   // If we got back a TournamentCV tuple, we can convert it to a Tournament object
   const tournamentCV = responseCV.value.value;
@@ -337,8 +369,12 @@ export async function getTournament(tournamentId: number, network: StacksNetwork
     creator: tournamentCV["creator"].value,
     "entry-fee": parseInt(tournamentCV["entry-fee"].value.toString()),
     "max-players": parseInt(tournamentCV["max-players"].value.toString()),
-    "current-players": parseInt(tournamentCV["current-players"].value.toString()),
-    status: parseInt(tournamentCV["status"].value.toString()) as TournamentStatus,
+    "current-players": parseInt(
+      tournamentCV["current-players"].value.toString()
+    ),
+    status: parseInt(
+      tournamentCV["status"].value.toString()
+    ) as TournamentStatus,
     winner:
       tournamentCV["winner"].type === "some"
         ? tournamentCV["winner"].value.value
@@ -346,10 +382,12 @@ export async function getTournament(tournamentId: number, network: StacksNetwork
     "prize-pool": parseInt(tournamentCV["prize-pool"].value.toString()),
     "created-at": parseInt(tournamentCV["created-at"].value.toString()),
   };
+
   return tournament;
 }
 
 export async function createTournament(entryFee: number, maxPlayers: number) {
+
   const txOptions = {
     contractAddress: CONTRACT_ADDRESS,
     contractName: CONTRACT_NAME,
@@ -382,3 +420,62 @@ export async function startTournament(tournamentId: number) {
   return txOptions;
 }
 
+// Tournament Game Functions
+
+export async function getTournamentGames(
+  tournamentId: number,
+  network: StacksNetwork = STACKS_TESTNET
+) {
+  // Get all games and filter by tournament ID
+  const allGames = await getAllGames(network);
+  const tournamentGames = allGames.filter(
+    (game) => game["tournament-id"] === tournamentId
+  );
+
+  return tournamentGames;
+}
+
+export async function getTournamentParticipant(
+  tournamentId: number,
+  slot: number,
+  network: StacksNetwork = STACKS_TESTNET
+) {
+  const participantDetails = await fetchCallReadOnlyFunction({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: "get-tournament-participant",
+    functionArgs: [uintCV(tournamentId), uintCV(slot)],
+    senderAddress: CONTRACT_ADDRESS,
+    network,
+  });
+
+  const responseCV = participantDetails as OptionalCV<PrincipalCV>;
+  return responseCV.type === "some" ? responseCV.value.value : null;
+}
+
+export async function getAllTournamentParticipants(
+  tournamentId: number,
+  maxPlayers: number,
+  network: StacksNetwork = STACKS_TESTNET
+) {
+  const participants: string[] = [];
+
+  for (let slot = 0; slot < maxPlayers; slot++) {
+    const participant = await getTournamentParticipant(tournamentId, slot, network);
+    if (participant) {
+      participants.push(participant);
+    }
+  }
+
+  return participants;
+}
+
+export async function isUserInTournament(
+  tournamentId: number,
+  userAddress: string,
+  maxPlayers: number,
+  network: StacksNetwork = STACKS_TESTNET
+): Promise<boolean> {
+  const participants = await getAllTournamentParticipants(tournamentId, maxPlayers, network);
+  return participants.includes(userAddress);
+}

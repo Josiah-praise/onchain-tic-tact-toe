@@ -28,10 +28,15 @@ export default function CreateGame() {
     const moveIndex = board.findIndex((cell) => cell !== Move.EMPTY);
     const move = Move.X;
     // Trigger the onchain transaction popup with redirect callback
-    await handleCreateGame(parseStx(betAmount), moveIndex, move, (gameId: number) => {
-      // Redirect to the created game
-      router.push(`/game/${gameId}`);
-    });
+    await handleCreateGame(
+      parseStx(betAmount),
+      moveIndex,
+      move,
+      (gameId: number) => {
+        // Redirect to the created game
+        router.push(`/game/${gameId}`);
+      }
+    );
   }
 
   return (

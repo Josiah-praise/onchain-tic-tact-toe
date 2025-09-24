@@ -1,4 +1,10 @@
-import { createNewGame, joinGame, Move, play, getAllGames } from "@/lib/contract";
+import {
+  createNewGame,
+  joinGame,
+  Move,
+  play,
+  getAllGames,
+} from "@/lib/contract";
 import { getStxBalance } from "@/lib/stx-utils";
 import { useNetwork } from "@/contexts/network-context";
 import {
@@ -62,9 +68,8 @@ export function useStacks() {
         ...txOptions,
         appDetails,
         onFinish: async (data) => {
-          console.log(data);
           window.alert("Sent create game transaction");
-          
+
           // Wait a bit for the transaction to be processed, then get the latest game ID
           if (onSuccess) {
             setTimeout(async () => {
@@ -72,15 +77,18 @@ export function useStacks() {
                 const games = await getAllGames(network);
                 const userAddress = userData.profile.stxAddress.testnet;
                 // Find the most recent game created by this user
-                const userCreatedGames = games.filter(game => 
-                  game["player-one"] === userAddress && game["player-two"] === null
+                const userCreatedGames = games.filter(
+                  (game) =>
+                    game["player-one"] === userAddress &&
+                    game["player-two"] === null
                 );
                 if (userCreatedGames.length > 0) {
-                  const latestGame = userCreatedGames.sort((a, b) => b.id - a.id)[0];
+                  const latestGame = userCreatedGames.sort(
+                    (a, b) => b.id - a.id
+                  )[0];
                   onSuccess(latestGame.id);
                 }
-              } catch (error) {
-                console.error("Failed to get created game ID:", error);
+              } catch {
               }
             }, 3000); // Wait 3 seconds for transaction to be processed
           }
@@ -89,7 +97,6 @@ export function useStacks() {
       });
     } catch (_err) {
       const err = _err as Error;
-      console.error(err);
       window.alert(err.message);
     }
   }
@@ -108,14 +115,12 @@ export function useStacks() {
         ...txOptions,
         appDetails,
         onFinish: (data) => {
-          console.log(data);
           window.alert("Sent join game transaction");
         },
         postConditionMode: PostConditionMode.Allow,
       });
     } catch (_err) {
       const err = _err as Error;
-      console.error(err);
       window.alert(err.message);
     }
   }
@@ -134,14 +139,12 @@ export function useStacks() {
         ...txOptions,
         appDetails,
         onFinish: (data) => {
-          console.log(data);
           window.alert("Sent play game transaction");
         },
         postConditionMode: PostConditionMode.Allow,
       });
     } catch (_err) {
       const err = _err as Error;
-      console.error(err);
       window.alert(err.message);
     }
   }
@@ -155,9 +158,8 @@ export function useStacks() {
       } else if (userSession.isUserSignedIn()) {
         setUserData(userSession.loadUserData());
       }
-    } catch (error) {
+    } catch {
       // Clear incompatible session data from v8.x.x
-      console.warn("Clearing incompatible session data:", error);
       userSession.signUserOut();
       localStorage.clear();
     }
@@ -165,15 +167,13 @@ export function useStacks() {
 
   useEffect(() => {
     if (userData) {
-      // In v7.x.x, both addresses are available, use the network-appropriate one
-      const address = networkType === "mainnet"
-        ? userData.profile.stxAddress.mainnet
-        : userData.profile.stxAddress.testnet;
-      getStxBalance(address, networkType).then((balance) => {
+      // Always use testnet address since mainnet is not supported
+      const address = userData.profile.stxAddress.testnet;
+      getStxBalance(address, "testnet").then((balance) => {
         setStxBalance(balance);
       });
     }
-  }, [userData, networkType]);
+  }, [userData]);
 
   return {
     userData,

@@ -7,7 +7,6 @@ const bob = accounts.get("wallet_2")!;
 const charlie = accounts.get("wallet_3")!;
 const dave = accounts.get("wallet_4")!;
 
-
 // Helper function to create a new game with the given bet amount, move index, and move
 // on behalf of the `user` address
 function createGame(
@@ -17,7 +16,7 @@ function createGame(
   user: string
 ) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "create-game",
     [Cl.uint(betAmount), Cl.uint(moveIndex), Cl.uint(move)],
     user
@@ -27,7 +26,7 @@ function createGame(
 // Helper function to join a game with the given move index and move on behalf of the `user` address
 function joinGame(moveIndex: number, move: number, user: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "join-game",
     [Cl.uint(0), Cl.uint(moveIndex), Cl.uint(move)],
     user
@@ -37,7 +36,7 @@ function joinGame(moveIndex: number, move: number, user: string) {
 // Helper function to play a move with the given move index and move on behalf of the `user` address
 function play(moveIndex: number, move: number, user: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "play",
     [Cl.uint(0), Cl.uint(moveIndex), Cl.uint(move)],
     user
@@ -47,7 +46,7 @@ function play(moveIndex: number, move: number, user: string) {
 // Tournament helper functions
 function createTournament(entryFee: number, maxPlayers: number, user: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "create-tournament",
     [Cl.uint(entryFee), Cl.uint(maxPlayers)],
     user
@@ -56,7 +55,7 @@ function createTournament(entryFee: number, maxPlayers: number, user: string) {
 
 function joinTournament(tournamentId: number, user: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "join-tournament",
     [Cl.uint(tournamentId)],
     user
@@ -65,7 +64,7 @@ function joinTournament(tournamentId: number, user: string) {
 
 function startTournament(tournamentId: number, user: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "start-tournament",
     [Cl.uint(tournamentId)],
     user
@@ -74,7 +73,7 @@ function startTournament(tournamentId: number, user: string) {
 
 function getTournament(tournamentId: number) {
   return simnet.callReadOnlyFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "get-tournament",
     [Cl.uint(tournamentId)],
     alice
@@ -83,7 +82,7 @@ function getTournament(tournamentId: number) {
 
 function getTournamentParticipant(tournamentId: number, slot: number) {
   return simnet.callReadOnlyFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "get-tournament-participant",
     [Cl.uint(tournamentId), Cl.uint(slot)],
     alice
@@ -162,7 +161,7 @@ describe("Tic Tac Toe Tests", () => {
     expect(result).toBeOk(Cl.uint(0));
     expect(events.length).toBe(2); // print_event and stx_transfer_event
 
-    const gameData = simnet.getMapEntry("tic-tac-toe", "games", Cl.uint(0));
+    const gameData = simnet.getMapEntry("tic-tac-toe-v2", "games", Cl.uint(0));
     expect(gameData).toBeSome(
       Cl.tuple({
         "player-one": Cl.principal(alice),
@@ -197,7 +196,7 @@ describe("Tic Tac Toe Tests", () => {
     expect(result).toBeOk(Cl.uint(0));
     expect(events.length).toBe(2); // print_event and stx_transfer_event
 
-    const gameData = simnet.getMapEntry("tic-tac-toe", "games", Cl.uint(0));
+    const gameData = simnet.getMapEntry("tic-tac-toe-v2", "games", Cl.uint(0));
     expect(gameData).toBeSome(
       Cl.tuple({
         "player-one": Cl.principal(alice),
@@ -237,19 +236,19 @@ describe("Tic Tac Toe Tests", () => {
   it("handles draw/tie games correctly", () => {
     // Create a game and play to a draw
     createGame(100, 4, 1, alice); // X in center
-    joinGame(0, 2, bob);          // O in top-left
-    play(8, 1, alice);            // X in bottom-right
-    play(1, 2, bob);              // O in top-center
-    play(7, 1, alice);            // X in bottom-center
-    play(5, 2, bob);              // O in middle-right
-    play(3, 1, alice);            // X in middle-left
-    play(6, 2, bob);              // O in bottom-left
+    joinGame(0, 2, bob); // O in top-left
+    play(8, 1, alice); // X in bottom-right
+    play(1, 2, bob); // O in top-center
+    play(7, 1, alice); // X in bottom-center
+    play(5, 2, bob); // O in middle-right
+    play(3, 1, alice); // X in middle-left
+    play(6, 2, bob); // O in bottom-left
     const { result, events } = play(2, 1, alice); // X in top-right - board is now full
 
     expect(result).toBeOk(Cl.uint(0));
     expect(events.length).toBe(3); // Two transfers (refunds) and one print event
 
-    const gameData = simnet.getMapEntry("tic-tac-toe", "games", Cl.uint(0));
+    const gameData = simnet.getMapEntry("tic-tac-toe-v2", "games", Cl.uint(0));
     expect(gameData).toBeSome(
       Cl.tuple({
         "player-one": Cl.principal(alice),
@@ -269,7 +268,9 @@ describe("Tic Tac Toe Tests", () => {
         ]),
         "tournament-id": Cl.none(),
         // Winner should be the contract address (indicating a draw)
-        winner: Cl.some(Cl.principal("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.tic-tac-toe")),
+        winner: Cl.some(
+          Cl.principal("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.tic-tac-toe")
+        ),
       })
     );
   });
@@ -388,19 +389,33 @@ describe("Tournament System Tests", () => {
     joinTournament(0, dave);
 
     // Check current game count
-    const { result: latestGameId } = simnet.callReadOnlyFn("tic-tac-toe", "get-latest-game-id", [], alice);
+    const { result: latestGameId } = simnet.callReadOnlyFn(
+      "tic-tac-toe-v2",
+      "get-latest-game-id",
+      [],
+      alice
+    );
     const gameCountBefore = latestGameId.expectUint();
 
     startTournament(0, alice);
 
     // Check that new games were created
-    const { result: newLatestGameId } = simnet.callReadOnlyFn("tic-tac-toe", "get-latest-game-id", [], alice);
+    const { result: newLatestGameId } = simnet.callReadOnlyFn(
+      "tic-tac-toe-v2",
+      "get-latest-game-id",
+      [],
+      alice
+    );
     const gameCountAfter = newLatestGameId.expectUint();
 
     expect(gameCountAfter).toBeGreaterThan(gameCountBefore);
 
     // Check that the new games have tournament-id
-    const game1 = simnet.getMapEntry("tic-tac-toe", "games", Cl.uint(Number(gameCountBefore)));
+    const game1 = simnet.getMapEntry(
+      "tic-tac-toe-v2",
+      "games",
+      Cl.uint(Number(gameCountBefore))
+    );
     expect(game1).toBeSome();
     const game1Data = game1.expectSome();
     expect(Cl.unwrap(game1Data)["tournament-id"]).toEqual(Cl.some(Cl.uint(0)));

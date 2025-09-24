@@ -1,14 +1,13 @@
 "use client";
 
-import { STACKS_MAINNET, STACKS_TESTNET, StacksNetwork } from "@stacks/network";
-import { createContext, useContext, useState, ReactNode } from "react";
+import { STACKS_TESTNET, StacksNetwork } from "@stacks/network";
+import { createContext, useContext, ReactNode } from "react";
 
-export type NetworkType = "mainnet" | "testnet";
+export type NetworkType = "testnet";
 
 interface NetworkContextType {
   networkType: NetworkType;
   network: StacksNetwork;
-  setNetworkType: (type: NetworkType) => void;
   getApiUrl: () => string;
   getExplorerUrl: () => string;
 }
@@ -16,20 +15,15 @@ interface NetworkContextType {
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
-  const [networkType, setNetworkType] = useState<NetworkType>("testnet");
-
-  const network = networkType === "mainnet" ? STACKS_MAINNET : STACKS_TESTNET;
+  const networkType: NetworkType = "testnet";
+  const network = STACKS_TESTNET;
 
   const getApiUrl = () => {
-    return networkType === "mainnet"
-      ? "https://api.hiro.so"
-      : "https://api.testnet.hiro.so";
+    return "https://api.testnet.hiro.so";
   };
 
   const getExplorerUrl = () => {
-    return networkType === "mainnet"
-      ? "https://explorer.hiro.so"
-      : "https://explorer.hiro.so";
+    return "https://explorer.hiro.so";
   };
 
   return (
@@ -37,7 +31,6 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       value={{
         networkType,
         network,
-        setNetworkType,
         getApiUrl,
         getExplorerUrl,
       }}

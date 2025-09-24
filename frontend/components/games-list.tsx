@@ -75,18 +75,27 @@ export function GamesList({ games }: { games: Game[] }) {
                       board={game.board}
                       cellClassName="size-8 text-xl"
                     />
+                    {/* Tournament Badge */}
+                    {game["tournament-id"] !== null && (
+                      <div className="text-xs px-2 py-1 bg-purple-600 text-purple-100 rounded text-center w-full font-medium">
+                        Tournament #{game["tournament-id"]}
+                      </div>
+                    )}
                     <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
                       {formatStx(game["bet-amount"])} STX
                     </div>
-                    <div className={`text-md px-1 py-0.5 rounded text-center w-full ${
-                      waitingForPlayer 
-                        ? "bg-yellow-600 text-yellow-100" 
-                        : "bg-gray-800"
-                    }`}>
-                      {waitingForPlayer 
-                        ? "Waiting for opponent" 
-                        : `Next Turn: ${game["is-player-one-turn"] ? "X" : "O"}`
-                      }
+                    <div
+                      className={`text-md px-1 py-0.5 rounded text-center w-full ${
+                        waitingForPlayer
+                          ? "bg-yellow-600 text-yellow-100"
+                          : "bg-gray-800"
+                      }`}
+                    >
+                      {waitingForPlayer
+                        ? "Waiting for opponent"
+                        : `Next Turn: ${
+                            game["is-player-one-turn"] ? "X" : "O"
+                          }`}
                     </div>
                   </Link>
                 );
@@ -123,6 +132,12 @@ export function GamesList({ games }: { games: Game[] }) {
                   board={game.board}
                   cellClassName="size-8 text-xl"
                 />
+                {/* Tournament Badge */}
+                {game["tournament-id"] !== null && (
+                  <div className="text-xs px-2 py-1 bg-purple-600 text-purple-100 rounded text-center w-full font-medium">
+                    🏆 Tournament #{game["tournament-id"]}
+                  </div>
+                )}
                 <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
                   {formatStx(game["bet-amount"])} STX
                 </div>
@@ -153,16 +168,16 @@ export function GamesList({ games }: { games: Game[] }) {
           <div className="flex items-center gap-8 max-w-7xl overflow-y-scroll">
             {endedGames.map((game, index) => {
               if (!userData) return null;
-              
+
               const userAddress = userData.profile.stxAddress.testnet;
               const isUserPlayerOne = game["player-one"] === userAddress;
               const isUserPlayerTwo = game["player-two"] === userAddress;
               const isUserInGame = isUserPlayerOne || isUserPlayerTwo;
-              
+
               // Determine the result text based on game outcome
               let resultText = "";
               let resultColor = "";
-              
+
               if (game.winner === null) {
                 // Winner is null - this should be treated as a tie
                 resultText = "Result: Tie";
@@ -188,7 +203,7 @@ export function GamesList({ games }: { games: Game[] }) {
                 resultText = `Winner: ${winnerIsPlayerOne ? "X" : "O"}`;
                 resultColor = "bg-gray-600";
               }
-              
+
               return (
                 <Link
                   key={`ended-game-${index}`}
@@ -200,10 +215,18 @@ export function GamesList({ games }: { games: Game[] }) {
                     board={game.board}
                     cellClassName="size-8 text-xl"
                   />
+                  {/* Tournament Badge */}
+                  {game["tournament-id"] !== null && (
+                    <div className="text-xs px-2 py-1 bg-purple-600 text-purple-100 rounded text-center w-full font-medium">
+                      🏆 Tournament #{game["tournament-id"]}
+                    </div>
+                  )}
                   <div className="text-md px-1 py-0.5 bg-gray-800 rounded text-center w-full">
                     {formatStx(game["bet-amount"])} STX
                   </div>
-                  <div className={`text-md px-1 py-0.5 rounded text-center w-full ${resultColor}`}>
+                  <div
+                    className={`text-md px-1 py-0.5 rounded text-center w-full ${resultColor}`}
+                  >
                     {resultText}
                   </div>
                 </Link>
