@@ -15,7 +15,7 @@ function createGame(
   user: string
 ) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "create-game",
     [Cl.uint(betAmount), Cl.uint(moveIndex), Cl.uint(move)],
     user
@@ -25,7 +25,7 @@ function createGame(
 // Helper function to join a game with the given move index and move on behalf of the `user` address
 function joinGame(moveIndex: number, move: number, user: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "join-game",
     [Cl.uint(0), Cl.uint(moveIndex), Cl.uint(move)],
     user
@@ -35,7 +35,7 @@ function joinGame(moveIndex: number, move: number, user: string) {
 // Helper function to play a move with the given move index and move on behalf of the `user` address
 function play(moveIndex: number, move: number, user: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe",
+    "tic-tac-toe-v2",
     "play",
     [Cl.uint(0), Cl.uint(moveIndex), Cl.uint(move)],
     user
@@ -114,7 +114,7 @@ describe("Tic Tac Toe Tests", () => {
     expect(result).toBeOk(Cl.uint(0));
     expect(events.length).toBe(2); // print_event and stx_transfer_event
 
-    const gameData = simnet.getMapEntry("tic-tac-toe", "games", Cl.uint(0));
+    const gameData = simnet.getMapEntry("tic-tac-toe-v2", "games", Cl.uint(0));
     expect(gameData).toBeSome(
       Cl.tuple({
         "player-one": Cl.principal(alice),
@@ -148,7 +148,7 @@ describe("Tic Tac Toe Tests", () => {
     expect(result).toBeOk(Cl.uint(0));
     expect(events.length).toBe(2); // print_event and stx_transfer_event
 
-    const gameData = simnet.getMapEntry("tic-tac-toe", "games", Cl.uint(0));
+    const gameData = simnet.getMapEntry("tic-tac-toe-v2", "games", Cl.uint(0));
     expect(gameData).toBeSome(
       Cl.tuple({
         "player-one": Cl.principal(alice),
