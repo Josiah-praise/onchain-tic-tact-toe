@@ -10,7 +10,7 @@ export function explorerAddress(address: string) {
   return `https://explorer.hiro.so/address/${address}?chain=testnet`;
 }
 
-export async function getStxBalance(address: string, networkType: "testnet" = "testnet") {
+export async function getStxBalance(address: string) {
   const baseUrl = "https://api.testnet.hiro.so";
   const url = `${baseUrl}/extended/v1/address/${address}/stx`;
 

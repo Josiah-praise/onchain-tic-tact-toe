@@ -50,7 +50,7 @@ export default function TournamentsPage() {
                 tournament["max-players"],
                 network
               );
-            } catch (error) {
+            } catch {
             }
           }
 

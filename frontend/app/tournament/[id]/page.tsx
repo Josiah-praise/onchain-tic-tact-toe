@@ -34,7 +34,7 @@ export default function TournamentPage() {
 
       setTournament(tournamentData);
       setGames(gamesData);
-    } catch (error) {
+    } catch {
     } finally {
       setLoading(false);
     }

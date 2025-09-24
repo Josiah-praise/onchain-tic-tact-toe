@@ -169,7 +169,7 @@ export function useStacks() {
     if (userData) {
       // Always use testnet address since mainnet is not supported
       const address = userData.profile.stxAddress.testnet;
-      getStxBalance(address, "testnet").then((balance) => {
+      getStxBalance(address).then((balance) => {
         setStxBalance(balance);
       });
     }
