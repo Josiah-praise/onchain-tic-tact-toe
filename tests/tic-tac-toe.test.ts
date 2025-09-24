@@ -132,6 +132,7 @@ describe("Tic Tac Toe Tests", () => {
           Cl.uint(0),
           Cl.uint(0),
         ]),
+        "tournament-id": Cl.none(),
         winner: Cl.some(Cl.principal(alice)),
       })
     );
@@ -166,6 +167,7 @@ describe("Tic Tac Toe Tests", () => {
           Cl.uint(0),
           Cl.uint(1),
         ]),
+        "tournament-id": Cl.none(),
         winner: Cl.some(Cl.principal(bob)),
       })
     );
