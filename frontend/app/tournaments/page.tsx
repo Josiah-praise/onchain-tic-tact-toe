@@ -64,6 +64,7 @@ export default function TournamentsPage() {
 
       setTournaments(tournamentsWithParticipation);
     } catch {
+    } finally {
       setLoading(false);
     }
   }, [userData, network]);

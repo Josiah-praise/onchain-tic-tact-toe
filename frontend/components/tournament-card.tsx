@@ -25,7 +25,7 @@ export function TournamentCard({
       case TournamentStatus.OPEN:
         return "Registration Open";
       case TournamentStatus.IN_PROGRESS:
-        return "Games Active";
+        return "Games Ended";
       case TournamentStatus.COMPLETED:
         return "All Games Complete";
       default:
