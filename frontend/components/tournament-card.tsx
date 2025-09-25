@@ -20,31 +20,31 @@ export function TournamentCard({
   canJoin = false,
   isParticipating = false,
 }: TournamentCardProps) {
-  const getStatusText = (status: TournamentStatus) => {
-    switch (status) {
-      case TournamentStatus.OPEN:
-        return "Registration Open";
-      case TournamentStatus.IN_PROGRESS:
-        return "Games Ended";
-      case TournamentStatus.COMPLETED:
-        return "All Games Complete";
-      default:
-        return "Unknown";
-    }
-  };
+  // const getStatusText = (status: TournamentStatus) => {
+  //   switch (status) {
+  //     case TournamentStatus.OPEN:
+  //       return "Registration Open";
+  //     case TournamentStatus.IN_PROGRESS:
+  //       return "Games ";
+  //     case TournamentStatus.COMPLETED:
+  //       return "All Games Complete";
+  //     default:
+  //       return "Unknown";
+  //   }
+  // };
 
-  const getStatusColor = (status: TournamentStatus) => {
-    switch (status) {
-      case TournamentStatus.OPEN:
-        return "bg-green-100 text-green-800";
-      case TournamentStatus.IN_PROGRESS:
-        return "bg-blue-100 text-blue-800";
-      case TournamentStatus.COMPLETED:
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  // const getStatusColor = (status: TournamentStatus) => {
+  //   switch (status) {
+  //     case TournamentStatus.OPEN:
+  //       return "bg-green-100 text-green-800";
+  //     case TournamentStatus.IN_PROGRESS:
+  //       return "bg-blue-100 text-blue-800";
+  //     case TournamentStatus.COMPLETED:
+  //       return "bg-gray-100 text-gray-800";
+  //     default:
+  //       return "bg-gray-100 text-gray-800";
+  //   }
+  // };
 
   const isFull = tournament["current-players"] >= tournament["max-players"];
   const canStartTournament =
@@ -61,13 +61,13 @@ export function TournamentCard({
             Created by {tournament.creator.slice(0, 10)}...
           </p>
         </div>
-        <span
+        {/* <span
           className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
             tournament.status
           )}`}
         >
           {getStatusText(tournament.status)}
-        </span>
+        </span> */}
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">

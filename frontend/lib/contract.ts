@@ -15,7 +15,7 @@ import {
 const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
   "STZ5Q1C2GVSMCWS9NWVDEKHNW04THC75SEGDHS74";
-const CONTRACT_NAME = process.env.NEXT_PUBLIC_CONTRACT_NAME || "tic-tac-toe-v2";
+const CONTRACT_NAME = process.env.NEXT_PUBLIC_CONTRACT_NAME || "tic-tac-toe-v3";
 
 type GameCV = {
   "player-one": PrincipalCV;
@@ -309,7 +309,6 @@ export async function play(gameId: number, moveIndex: number, move: Move) {
 export async function getAllTournaments(
   network: StacksNetwork = STACKS_TESTNET
 ) {
-
   // Fetch the latest-tournament-id from the contract
   const latestTournamentIdCV = (await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -319,7 +318,6 @@ export async function getAllTournaments(
     senderAddress: CONTRACT_ADDRESS,
     network,
   })) as UIntCV;
-
 
   // Convert the uintCV to a JS/TS number type
   const latestTournamentId = parseInt(latestTournamentIdCV.value.toString());
@@ -339,7 +337,6 @@ export async function getTournament(
   tournamentId: number,
   network: StacksNetwork = STACKS_TESTNET
 ) {
-
   // Use the get-tournament read only function to fetch the tournament details for the given tournamentId
   const tournamentDetails = await fetchCallReadOnlyFunction({
     contractAddress: CONTRACT_ADDRESS,
@@ -349,7 +346,6 @@ export async function getTournament(
     senderAddress: CONTRACT_ADDRESS,
     network,
   });
-
 
   const responseCV = tournamentDetails as OptionalCV<TupleCV<TournamentCV>>;
   // If we get back a none, then the tournament does not exist and we return null
@@ -387,7 +383,6 @@ export async function getTournament(
 }
 
 export async function createTournament(entryFee: number, maxPlayers: number) {
-
   const txOptions = {
     contractAddress: CONTRACT_ADDRESS,
     contractName: CONTRACT_NAME,
@@ -461,7 +456,11 @@ export async function getAllTournamentParticipants(
   const participants: string[] = [];
 
   for (let slot = 0; slot < maxPlayers; slot++) {
-    const participant = await getTournamentParticipant(tournamentId, slot, network);
+    const participant = await getTournamentParticipant(
+      tournamentId,
+      slot,
+      network
+    );
     if (participant) {
       participants.push(participant);
     }
@@ -476,6 +475,10 @@ export async function isUserInTournament(
   maxPlayers: number,
   network: StacksNetwork = STACKS_TESTNET
 ): Promise<boolean> {
-  const participants = await getAllTournamentParticipants(tournamentId, maxPlayers, network);
+  const participants = await getAllTournamentParticipants(
+    tournamentId,
+    maxPlayers,
+    network
+  );
   return participants.includes(userAddress);
 }

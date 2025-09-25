@@ -1,1 +1,1 @@
-Live Url: https://onchain-tic-tact-9md9csand-praises-projects-ebb73491.vercel.app
+Live Url: https://onchain-tic-tact-toe-git-featu-e4c52c-praises-projects-ebb73491.vercel.app/

@@ -250,6 +250,15 @@ uint
     ;; Update the games map with the new game data
     (map-set games game-id game-data)
 
+    ;; Check tournament completion if this game belongs to a tournament and game is over
+    (if is-game-over
+        (match (get tournament-id game-data)
+            some-tournament-id (begin (try! (check-and-complete-tournament some-tournament-id)) true)
+            true
+        )
+        true
+    )
+
     ;; Log the action of a move being made
     (print {action: "play", data: game-data})
     ;; Return the Game ID of the game
@@ -288,6 +297,83 @@ uint
         (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u13}) (some player))
         (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u14}) (some player))
         (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u15}) (some player))
+    )
+)
+
+(define-private (is-game-completed (game-data {player-one: principal, player-two: (optional principal), is-player-one-turn: bool, bet-amount: uint, board: (list 9 uint), winner: (optional principal), tournament-id: (optional uint)}))
+    (or
+        ;; Has explicit winner
+        (is-some (get winner game-data))
+        ;; Board is full (draw case)
+        (is-board-full (get board game-data))
+    )
+)
+
+(define-private (get-expected-game-count (max-players uint))
+    (if (is-eq max-players u2)
+        u1
+        (if (is-eq max-players u3)
+            u1
+            (if (is-eq max-players u4)
+                u2
+                (if (is-eq max-players u6)
+                    u3
+                    (if (is-eq max-players u8)
+                        u4
+                        (if (is-eq max-players u16)
+                            u8
+                            u0  ;; Invalid size
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+(define-private (is-tournament-game-completed (tournament-id uint) (round uint) (match-index uint))
+    (match (map-get? tournament-rounds {tournament-id: tournament-id, round: round, match: match-index})
+        game-id (match (map-get? games game-id)
+            game-data (is-game-completed game-data)
+            false  ;; Game not found
+        )
+        false  ;; Match not found
+    )
+)
+
+(define-private (count-completed-tournament-games (tournament-id uint))
+    (let (
+        (count-0 (if (is-tournament-game-completed tournament-id u1 u0) u1 u0))
+        (count-1 (if (is-tournament-game-completed tournament-id u1 u1) u1 u0))
+        (count-2 (if (is-tournament-game-completed tournament-id u1 u2) u1 u0))
+        (count-3 (if (is-tournament-game-completed tournament-id u1 u3) u1 u0))
+        (count-4 (if (is-tournament-game-completed tournament-id u1 u4) u1 u0))
+        (count-5 (if (is-tournament-game-completed tournament-id u1 u5) u1 u0))
+        (count-6 (if (is-tournament-game-completed tournament-id u1 u6) u1 u0))
+        (count-7 (if (is-tournament-game-completed tournament-id u1 u7) u1 u0))
+    )
+    (+ count-0 count-1 count-2 count-3 count-4 count-5 count-6 count-7)
+    )
+)
+
+(define-private (check-and-complete-tournament (tournament-id uint))
+    (let (
+        (tournament (unwrap! (map-get? tournaments tournament-id) (err ERR_TOURNAMENT_NOT_FOUND)))
+        (max-players (get max-players tournament))
+        (expected-games (get-expected-game-count max-players))
+        (completed-games (count-completed-tournament-games tournament-id))
+    )
+
+    ;; If all games are completed, mark tournament as finished
+    (if (>= completed-games expected-games)
+        (begin
+            (map-set tournaments tournament-id (merge tournament {status: u2}))
+            (print {action: "tournament-completed", tournament-id: tournament-id})
+            true
+        )
+        false
+    )
+    (ok true)
     )
 )
 

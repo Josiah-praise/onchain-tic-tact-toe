@@ -12,9 +12,13 @@ const grace = accounts.get("wallet_7")!;
 const henry = accounts.get("wallet_8")!;
 
 // Helper function to create a tournament
-function createTournament(entryFee: number, maxPlayers: number, creator: string) {
+function createTournament(
+  entryFee: number,
+  maxPlayers: number,
+  creator: string
+) {
   return simnet.callPublicFn(
-    "tic-tac-toe-v2",
+    "tic-tac-toe-v3",
     "create-tournament",
     [Cl.uint(entryFee), Cl.uint(maxPlayers)],
     creator
@@ -24,7 +28,7 @@ function createTournament(entryFee: number, maxPlayers: number, creator: string)
 // Helper function to join a tournament
 function joinTournament(tournamentId: number, player: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe-v2",
+    "tic-tac-toe-v3",
     "join-tournament",
     [Cl.uint(tournamentId)],
     player
@@ -34,7 +38,7 @@ function joinTournament(tournamentId: number, player: string) {
 // Helper function to start a tournament
 function startTournament(tournamentId: number, creator: string) {
   return simnet.callPublicFn(
-    "tic-tac-toe-v2",
+    "tic-tac-toe-v3",
     "start-tournament",
     [Cl.uint(tournamentId)],
     creator
@@ -44,7 +48,7 @@ function startTournament(tournamentId: number, creator: string) {
 // Helper function to get tournament data
 function getTournament(tournamentId: number) {
   return simnet.callReadOnlyFn(
-    "tic-tac-toe-v2",
+    "tic-tac-toe-v3",
     "get-tournament",
     [Cl.uint(tournamentId)],
     alice
@@ -54,7 +58,7 @@ function getTournament(tournamentId: number) {
 // Helper function to get tournament participant
 function getTournamentParticipant(tournamentId: number, slot: number) {
   return simnet.callReadOnlyFn(
-    "tic-tac-toe-v2",
+    "tic-tac-toe-v3",
     "get-tournament-participant",
     [Cl.uint(tournamentId), Cl.uint(slot)],
     alice
@@ -64,7 +68,7 @@ function getTournamentParticipant(tournamentId: number, slot: number) {
 // Helper function to get tournament game
 function getTournamentGame(tournamentId: number, round: number, match: number) {
   return simnet.callReadOnlyFn(
-    "tic-tac-toe-v2",
+    "tic-tac-toe-v3",
     "get-tournament-game",
     [Cl.uint(tournamentId), Cl.uint(round), Cl.uint(match)],
     alice
@@ -90,7 +94,7 @@ describe("Tournament Tests", () => {
           status: Cl.uint(0), // open
           winner: Cl.none(),
           "prize-pool": Cl.uint(100),
-          "created-at": Cl.uint(3) // block height
+          "created-at": Cl.uint(3), // block height
         })
       );
 
@@ -134,7 +138,7 @@ describe("Tournament Tests", () => {
       expect(result2.result).toBeOk(Cl.uint(1));
 
       const latestId = simnet.callReadOnlyFn(
-        "tic-tac-toe-v2",
+        "tic-tac-toe-v3",
         "get-latest-tournament-id",
         [],
         alice
@@ -162,7 +166,7 @@ describe("Tournament Tests", () => {
           status: Cl.uint(0), // still open
           winner: Cl.none(),
           "prize-pool": Cl.uint(200), // 100 + 100
-          "created-at": Cl.uint(3)
+          "created-at": Cl.uint(3),
         })
       );
 
@@ -190,15 +194,21 @@ describe("Tournament Tests", () => {
           status: Cl.uint(0),
           winner: Cl.none(),
           "prize-pool": Cl.uint(400), // 4 * 100
-          "created-at": Cl.uint(3)
+          "created-at": Cl.uint(3),
         })
       );
 
       // Check all participants
-      expect(getTournamentParticipant(0, 0).result).toBeSome(Cl.principal(alice));
+      expect(getTournamentParticipant(0, 0).result).toBeSome(
+        Cl.principal(alice)
+      );
       expect(getTournamentParticipant(0, 1).result).toBeSome(Cl.principal(bob));
-      expect(getTournamentParticipant(0, 2).result).toBeSome(Cl.principal(charlie));
-      expect(getTournamentParticipant(0, 3).result).toBeSome(Cl.principal(david));
+      expect(getTournamentParticipant(0, 2).result).toBeSome(
+        Cl.principal(charlie)
+      );
+      expect(getTournamentParticipant(0, 3).result).toBeSome(
+        Cl.principal(david)
+      );
     });
 
     it("does not allow joining a non-existent tournament", () => {
@@ -255,7 +265,7 @@ describe("Tournament Tests", () => {
           status: Cl.uint(1), // in-progress
           winner: Cl.none(),
           "prize-pool": Cl.uint(400),
-          "created-at": Cl.uint(3)
+          "created-at": Cl.uint(3),
         })
       );
     });
@@ -278,12 +288,18 @@ describe("Tournament Tests", () => {
           "is-player-one-turn": Cl.bool(true),
           "bet-amount": Cl.uint(100),
           board: Cl.list([
-            Cl.uint(0), Cl.uint(0), Cl.uint(0),
-            Cl.uint(0), Cl.uint(0), Cl.uint(0),
-            Cl.uint(0), Cl.uint(0), Cl.uint(0)
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
           ]),
           "tournament-id": Cl.some(Cl.uint(0)),
-          winner: Cl.none()
+          winner: Cl.none(),
         })
       );
 
@@ -294,12 +310,18 @@ describe("Tournament Tests", () => {
           "is-player-one-turn": Cl.bool(true),
           "bet-amount": Cl.uint(100),
           board: Cl.list([
-            Cl.uint(0), Cl.uint(0), Cl.uint(0),
-            Cl.uint(0), Cl.uint(0), Cl.uint(0),
-            Cl.uint(0), Cl.uint(0), Cl.uint(0)
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
+            Cl.uint(0),
           ]),
           "tournament-id": Cl.some(Cl.uint(0)),
-          winner: Cl.none()
+          winner: Cl.none(),
         })
       );
     });
@@ -403,7 +425,7 @@ describe("Tournament Tests", () => {
           status: Cl.uint(0),
           winner: Cl.none(),
           "prize-pool": Cl.uint(100),
-          "created-at": Cl.uint(3)
+          "created-at": Cl.uint(3),
         })
       );
     });
@@ -417,14 +439,16 @@ describe("Tournament Tests", () => {
       createTournament(100, 4, alice);
       joinTournament(0, bob);
 
-      expect(getTournamentParticipant(0, 0).result).toBeSome(Cl.principal(alice));
+      expect(getTournamentParticipant(0, 0).result).toBeSome(
+        Cl.principal(alice)
+      );
       expect(getTournamentParticipant(0, 1).result).toBeSome(Cl.principal(bob));
       expect(getTournamentParticipant(0, 2).result).toBeNone();
     });
 
     it("get-latest-tournament-id tracks correctly", () => {
       const initial = simnet.callReadOnlyFn(
-        "tic-tac-toe-v2",
+        "tic-tac-toe-v3",
         "get-latest-tournament-id",
         [],
         alice
@@ -434,7 +458,7 @@ describe("Tournament Tests", () => {
       createTournament(100, 4, alice);
 
       const after = simnet.callReadOnlyFn(
-        "tic-tac-toe-v2",
+        "tic-tac-toe-v3",
         "get-latest-tournament-id",
         [],
         alice
