@@ -10,7 +10,7 @@ export function Navbar() {
   return (
     <nav className="flex w-full items-center justify-between gap-4 p-4 h-16 border-b border-gray-500">
       <Link href="/" className="text-2xl font-bold">
-        TicTacToe 🎲
+        TicTacToe
       </Link>
 
       <div className="flex items-center gap-8">
@@ -20,6 +20,12 @@ export function Navbar() {
         <Link href="/create" className="text-gray-300 hover:text-gray-50">
           Create Game
         </Link>
+        <Link href="/tournaments" className="text-gray-300 hover:text-gray-50">
+          Tournaments
+        </Link>
+        <div className="text-xs px-2 py-1 bg-blue-600 text-blue-100 rounded font-medium">
+          Testnet
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

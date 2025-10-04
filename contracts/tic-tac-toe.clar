@@ -1,17 +1,36 @@
 ;; the game-id to use for the next game
 (define-data-var latest-game-id uint u0)
 
-(define-map games 
-uint 
+;; the tournament-id to use for the next tournament
+(define-data-var latest-tournament-id uint u0)
+
+(define-map games
+uint
 {
     player-one: principal,
     player-two: (optional principal),
     is-player-one-turn: bool,
     bet-amount: uint,
     winner: (optional principal),
-    board: (list 9 uint)
+    board: (list 9 uint),
+    tournament-id: (optional uint)
 }
 )
+
+(define-map tournaments uint {
+    creator: principal,
+    entry-fee: uint,
+    max-players: uint,
+    current-players: uint,
+    status: uint, ;; 0=open, 1=in-progress, 2=completed
+    winner: (optional principal),
+    prize-pool: uint,
+    created-at: uint
+})
+
+(define-map tournament-participants {tournament-id: uint, slot: uint} principal)
+
+(define-map tournament-rounds {tournament-id: uint, round: uint, match: uint} uint)
 
 
 (define-private (validate-move (board (list 9 uint)) (move-index uint) (move uint))
@@ -36,6 +55,16 @@ uint
 (define-constant ERR_GAME_NOT_FOUND u102) ;; Error thrown when a game cannot be found given a Game ID, i.e. invalid Game ID
 (define-constant ERR_GAME_CANNOT_BE_JOINED u103) ;; Error thrown when a game cannot be joined, usually because it already has two players
 (define-constant ERR_NOT_YOUR_TURN u104) ;; Error thrown when a player tries to make a move when it is not their turn
+(define-constant ERR_GAME_ALREADY_OVER u105) ;; Error thrown when trying to make a move in a game that already has a winner
+
+;; Tournament error constants
+(define-constant ERR_TOURNAMENT_NOT_FOUND u200)
+(define-constant ERR_TOURNAMENT_FULL u201)
+(define-constant ERR_TOURNAMENT_NOT_OPEN u202)
+(define-constant ERR_INVALID_TOURNAMENT_SIZE u203)
+(define-constant ERR_ALREADY_JOINED u204)
+(define-constant ERR_NOT_TOURNAMENT_CREATOR u205)
+(define-constant ERR_TOURNAMENT_NOT_READY u206)
 
 (define-public (create-game (bet-amount uint) (move-index uint) (move uint))
     (let (
@@ -52,7 +81,8 @@ uint
             is-player-one-turn: false,
             bet-amount: bet-amount,
             board: game-board,
-            winner: none
+            winner: none,
+            tournament-id: none
         })
     )
 
@@ -130,7 +160,7 @@ uint
 ))
 
 ;; Given a board, return true if any possible three-in-a-row line has been completed
-(define-private (has-won (board (list 9 uint))) 
+(define-private (has-won (board (list 9 uint)))
     (or
         (is-line board u0 u1 u2) ;; Row 1
         (is-line board u3 u4 u5) ;; Row 2
@@ -140,6 +170,21 @@ uint
         (is-line board u2 u5 u8) ;; Column 3
         (is-line board u0 u4 u8) ;; Left to Right Diagonal
         (is-line board u2 u4 u6) ;; Right to Left Diagonal
+    )
+)
+
+;; Given a board, return true if all cells are filled (no empty cells)
+(define-private (is-board-full (board (list 9 uint)))
+    (and
+        (not (is-eq (unwrap! (element-at? board u0) false) u0))
+        (not (is-eq (unwrap! (element-at? board u1) false) u0))
+        (not (is-eq (unwrap! (element-at? board u2) false) u0))
+        (not (is-eq (unwrap! (element-at? board u3) false) u0))
+        (not (is-eq (unwrap! (element-at? board u4) false) u0))
+        (not (is-eq (unwrap! (element-at? board u5) false) u0))
+        (not (is-eq (unwrap! (element-at? board u6) false) u0))
+        (not (is-eq (unwrap! (element-at? board u7) false) u0))
+        (not (is-eq (unwrap! (element-at? board u8) false) u0))
     )
 )
 
@@ -161,15 +206,26 @@ uint
         (game-board (unwrap! (replace-at? original-board move-index move) (err ERR_INVALID_MOVE)))
         ;; Check if the game has been won now with this modified board
         (is-now-winner (has-won game-board))
+        ;; Check if the board is now full (for draw detection)
+        (is-board-now-full (is-board-full game-board))
+        ;; Check if the game is over (either won or drawn)
+        (is-game-over (or is-now-winner is-board-now-full))
         ;; Merge the game data with the updated board and marking the next turn to be player two's turn
-        ;; Also mark the winner if the game has been won
+        ;; Also mark the winner if the game has been won, or use a special value for draws
         (game-data (merge original-game-data {
             board: game-board,
             is-player-one-turn: (not is-player-one-turn),
-            winner: (if is-now-winner (some player-turn) none)
+            winner: (if is-now-winner
+                        (some player-turn)
+                        (if is-board-now-full
+                            ;; Use the contract address to indicate a draw/tie
+                            (some THIS_CONTRACT)
+                            none))
         }))
     )
 
+    ;; Ensure that the game is not already over (no winner exists)
+    (asserts! (is-none (get winner original-game-data)) (err ERR_GAME_ALREADY_OVER))
     ;; Ensure that the function is being called by the player whose turn it is
     (asserts! (is-eq player-turn contract-caller) (err ERR_NOT_YOUR_TURN))
     ;; Ensure that the move being played is the correct move based on the current turn (X or O)
@@ -177,11 +233,31 @@ uint
     ;; Ensure that the move meets validity requirements
     (asserts! (validate-move original-board move-index move) (err ERR_INVALID_MOVE))
 
-    ;; if the game has been won, transfer the (bet amount * 2 = both players bets) STX to the winner
-    (if is-now-winner (try! (as-contract (stx-transfer? (* u2 (get bet-amount game-data)) tx-sender player-turn))) false)
+    ;; Handle end game fund transfers
+    (if is-game-over
+        (if is-now-winner
+            ;; Someone won: transfer all funds to the winner
+            (try! (as-contract (stx-transfer? (* u2 (get bet-amount game-data)) tx-sender player-turn)))
+            ;; Draw: return funds to both players
+            (begin
+                (try! (as-contract (stx-transfer? (get bet-amount game-data) tx-sender (get player-one original-game-data))))
+                (try! (as-contract (stx-transfer? (get bet-amount game-data) tx-sender (unwrap! (get player-two original-game-data) (err ERR_GAME_NOT_FOUND)))))
+            )
+        )
+        false
+    )
 
     ;; Update the games map with the new game data
     (map-set games game-id game-data)
+
+    ;; Check tournament completion if this game belongs to a tournament and game is over
+    (if is-game-over
+        (match (get tournament-id game-data)
+            some-tournament-id (begin (try! (check-and-complete-tournament some-tournament-id)) true)
+            true
+        )
+        true
+    )
 
     ;; Log the action of a move being made
     (print {action: "play", data: game-data})
@@ -195,5 +271,286 @@ uint
 
 (define-read-only (get-latest-game-id)
     (var-get latest-game-id)
+)
+
+;; Tournament Functions
+
+(define-private (is-valid-tournament-size (size uint))
+    (or (is-eq size u4) (is-eq size u8) (is-eq size u16))
+)
+
+(define-private (is-player-in-tournament (tournament-id uint) (player principal))
+    (or
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u0}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u1}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u2}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u3}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u4}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u5}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u6}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u7}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u8}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u9}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u10}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u11}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u12}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u13}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u14}) (some player))
+        (is-eq (map-get? tournament-participants {tournament-id: tournament-id, slot: u15}) (some player))
+    )
+)
+
+(define-private (is-game-completed (game-data {player-one: principal, player-two: (optional principal), is-player-one-turn: bool, bet-amount: uint, board: (list 9 uint), winner: (optional principal), tournament-id: (optional uint)}))
+    (or
+        ;; Has explicit winner
+        (is-some (get winner game-data))
+        ;; Board is full (draw case)
+        (is-board-full (get board game-data))
+    )
+)
+
+(define-private (get-expected-game-count (max-players uint))
+    (if (is-eq max-players u2)
+        u1
+        (if (is-eq max-players u3)
+            u1
+            (if (is-eq max-players u4)
+                u2
+                (if (is-eq max-players u6)
+                    u3
+                    (if (is-eq max-players u8)
+                        u4
+                        (if (is-eq max-players u16)
+                            u8
+                            u0  ;; Invalid size
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+(define-private (is-tournament-game-completed (tournament-id uint) (round uint) (match-index uint))
+    (match (map-get? tournament-rounds {tournament-id: tournament-id, round: round, match: match-index})
+        game-id (match (map-get? games game-id)
+            game-data (is-game-completed game-data)
+            false  ;; Game not found
+        )
+        false  ;; Match not found
+    )
+)
+
+(define-private (count-completed-tournament-games (tournament-id uint))
+    (let (
+        (count-0 (if (is-tournament-game-completed tournament-id u1 u0) u1 u0))
+        (count-1 (if (is-tournament-game-completed tournament-id u1 u1) u1 u0))
+        (count-2 (if (is-tournament-game-completed tournament-id u1 u2) u1 u0))
+        (count-3 (if (is-tournament-game-completed tournament-id u1 u3) u1 u0))
+        (count-4 (if (is-tournament-game-completed tournament-id u1 u4) u1 u0))
+        (count-5 (if (is-tournament-game-completed tournament-id u1 u5) u1 u0))
+        (count-6 (if (is-tournament-game-completed tournament-id u1 u6) u1 u0))
+        (count-7 (if (is-tournament-game-completed tournament-id u1 u7) u1 u0))
+    )
+    (+ count-0 count-1 count-2 count-3 count-4 count-5 count-6 count-7)
+    )
+)
+
+(define-private (check-and-complete-tournament (tournament-id uint))
+    (let (
+        (tournament (unwrap! (map-get? tournaments tournament-id) (err ERR_TOURNAMENT_NOT_FOUND)))
+        (max-players (get max-players tournament))
+        (expected-games (get-expected-game-count max-players))
+        (completed-games (count-completed-tournament-games tournament-id))
+    )
+
+    ;; If all games are completed, mark tournament as finished
+    (if (>= completed-games expected-games)
+        (begin
+            (map-set tournaments tournament-id (merge tournament {status: u2}))
+            (print {action: "tournament-completed", tournament-id: tournament-id})
+            true
+        )
+        false
+    )
+    (ok true)
+    )
+)
+
+(define-public (create-tournament (entry-fee uint) (max-players uint))
+    (let (
+        (tournament-id (var-get latest-tournament-id))
+        (tournament-data {
+            creator: contract-caller,
+            entry-fee: entry-fee,
+            max-players: max-players,
+            current-players: u1,
+            status: u0,
+            winner: none,
+            prize-pool: entry-fee,
+            created-at: stacks-block-height
+        })
+    )
+
+    ;; Validations
+    (asserts! (> entry-fee u0) (err ERR_MIN_BET_AMOUNT))
+    (asserts! (is-valid-tournament-size max-players) (err ERR_INVALID_TOURNAMENT_SIZE))
+
+    ;; Transfer entry fee
+    (try! (stx-transfer? entry-fee contract-caller THIS_CONTRACT))
+
+    ;; Create tournament
+    (map-set tournaments tournament-id tournament-data)
+
+    ;; Add creator as first participant
+    (map-set tournament-participants {tournament-id: tournament-id, slot: u0} contract-caller)
+
+    ;; Increment counter
+    (var-set latest-tournament-id (+ tournament-id u1))
+
+    ;; Log event
+    (print {action: "create-tournament", tournament-id: tournament-id, creator: contract-caller})
+    (ok tournament-id)
+    )
+)
+
+(define-public (join-tournament (tournament-id uint))
+    (let (
+        (tournament (unwrap! (map-get? tournaments tournament-id) (err ERR_TOURNAMENT_NOT_FOUND)))
+        (current-players (get current-players tournament))
+        (max-players (get max-players tournament))
+        (entry-fee (get entry-fee tournament))
+        (new-slot current-players)
+    )
+
+    ;; Validations
+    (asserts! (is-eq (get status tournament) u0) (err ERR_TOURNAMENT_NOT_OPEN))
+    (asserts! (< current-players max-players) (err ERR_TOURNAMENT_FULL))
+    (asserts! (not (is-player-in-tournament tournament-id contract-caller)) (err ERR_ALREADY_JOINED))
+
+    ;; Transfer entry fee
+    (try! (stx-transfer? entry-fee contract-caller THIS_CONTRACT))
+
+    ;; Add player to tournament
+    (map-set tournament-participants {tournament-id: tournament-id, slot: new-slot} contract-caller)
+
+    ;; Update tournament data
+    (map-set tournaments tournament-id (merge tournament {
+        current-players: (+ current-players u1),
+        prize-pool: (+ (get prize-pool tournament) entry-fee)
+    }))
+
+    ;; Log event
+    (print {action: "join-tournament", tournament-id: tournament-id, player: contract-caller, slot: new-slot})
+    (ok tournament-id)
+    )
+)
+
+(define-public (start-tournament (tournament-id uint))
+    (let (
+        (tournament (unwrap! (map-get? tournaments tournament-id) (err ERR_TOURNAMENT_NOT_FOUND)))
+    )
+
+    ;; Validations
+    (asserts! (is-eq (get creator tournament) contract-caller) (err ERR_NOT_TOURNAMENT_CREATOR))
+    (asserts! (is-eq (get status tournament) u0) (err ERR_TOURNAMENT_NOT_OPEN))
+    (asserts! (is-eq (get current-players tournament) (get max-players tournament)) (err ERR_TOURNAMENT_NOT_READY))
+
+    ;; Update tournament status
+    (map-set tournaments tournament-id (merge tournament {status: u1}))
+
+    ;; Create first round games
+    (try! (create-first-round-games tournament-id))
+
+    ;; Log event
+    (print {action: "start-tournament", tournament-id: tournament-id})
+    (ok true)
+    )
+)
+
+(define-private (create-first-round-games (tournament-id uint))
+    (let (
+        (tournament (unwrap! (map-get? tournaments tournament-id) (err ERR_TOURNAMENT_NOT_FOUND)))
+        (max-players (get max-players tournament))
+    )
+
+    ;; Create games based on tournament size
+    (if (is-eq max-players u4)
+        (begin
+            (try! (create-single-game tournament-id u1 u0 u0 u1))
+            (try! (create-single-game tournament-id u1 u1 u2 u3))
+            (ok true)
+        )
+        (if (is-eq max-players u8)
+            (begin
+                (try! (create-single-game tournament-id u1 u0 u0 u1))
+                (try! (create-single-game tournament-id u1 u1 u2 u3))
+                (try! (create-single-game tournament-id u1 u2 u4 u5))
+                (try! (create-single-game tournament-id u1 u3 u6 u7))
+                (ok true)
+            )
+            (if (is-eq max-players u16)
+                (begin
+                    (try! (create-single-game tournament-id u1 u0 u0 u1))
+                    (try! (create-single-game tournament-id u1 u1 u2 u3))
+                    (try! (create-single-game tournament-id u1 u2 u4 u5))
+                    (try! (create-single-game tournament-id u1 u3 u6 u7))
+                    (try! (create-single-game tournament-id u1 u4 u8 u9))
+                    (try! (create-single-game tournament-id u1 u5 u10 u11))
+                    (try! (create-single-game tournament-id u1 u6 u12 u13))
+                    (try! (create-single-game tournament-id u1 u7 u14 u15))
+                    (ok true)
+                )
+                (ok true)
+            )
+        )
+    )
+    )
+)
+
+(define-private (create-single-game (tournament-id uint) (round uint) (match-index uint) (player1-slot uint) (player2-slot uint))
+    (let (
+        (tournament (unwrap! (map-get? tournaments tournament-id) (err ERR_TOURNAMENT_NOT_FOUND)))
+        (player1 (unwrap! (map-get? tournament-participants {tournament-id: tournament-id, slot: player1-slot}) (err ERR_TOURNAMENT_NOT_FOUND)))
+        (player2 (unwrap! (map-get? tournament-participants {tournament-id: tournament-id, slot: player2-slot}) (err ERR_TOURNAMENT_NOT_FOUND)))
+        (game-id (var-get latest-game-id))
+        (game-data {
+            player-one: player1,
+            player-two: (some player2),
+            is-player-one-turn: true,
+            bet-amount: (get entry-fee tournament),
+            board: (list u0 u0 u0 u0 u0 u0 u0 u0 u0),
+            winner: none,
+            tournament-id: (some tournament-id)
+        })
+    )
+
+    ;; Create tournament game
+    (map-set games game-id game-data)
+    (map-set tournament-rounds {tournament-id: tournament-id, round: round, match: match-index} game-id)
+    (var-set latest-game-id (+ game-id u1))
+    (ok true)
+    )
+)
+
+;; Read-only functions for tournaments
+
+(define-read-only (get-tournament (tournament-id uint))
+    (map-get? tournaments tournament-id)
+)
+
+(define-read-only (get-latest-tournament-id)
+    (var-get latest-tournament-id)
+)
+
+(define-read-only (get-tournament-participant (tournament-id uint) (slot uint))
+    (map-get? tournament-participants {tournament-id: tournament-id, slot: slot})
+)
+
+(define-read-only (get-tournament-game (tournament-id uint) (round uint) (match-num uint))
+    (match (map-get? tournament-rounds {tournament-id: tournament-id, round: round, match: match-num})
+        game-id (map-get? games game-id)
+        none
+    )
 )
 

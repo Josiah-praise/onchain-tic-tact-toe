@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
+import { ClientWrapper } from "@/components/client-wrapper";
 
 export const metadata: Metadata = {
   title: "Tic Tac Toe",
@@ -15,8 +16,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Navbar />
-        {children}
+        <ClientWrapper>
+          <div className="antialiased bg-gray-900 text-gray-50">
+            <Navbar />
+            {children}
+          </div>
+        </ClientWrapper>
       </body>
     </html>
   );
